@@ -78,10 +78,10 @@ class Blockchain {
       block.timeStamp = new Date().getTime().toString().slice(0, -3);
       // Set the hash of the entire block
       block.hash = SHA256(JSON.stringify(block)).toString();
-      // Check if the block is valid
-      if (block.validate()) {
-        // Add the block to the chain
-        self.chain.push(block);
+      // Add block to the chain
+      self.chain.push(block);
+      // Check if the blockchain is valid
+      if (self.validateChain()) {
         resolve(block);
       } else {
         reject();
@@ -229,7 +229,9 @@ class Blockchain {
         promises.push(block.validate());
         // For all non-genesis blocks check previous hash
         if(block.height > 0) {
-          block.previousBlockHash !== self.getBlockByHeight(block.height - 1).hash ? errorLog.push(`Error with block ${block.height} - previous hash doesn't match.`) : _;
+          if(block.previousBlockHash !== self.chain[block.height - 1].hash) {
+            errorLog.push(`Error with block ${block.height} - previous hash doesn't match.`)
+          }
         }
       });
       // Wait for all promises to resolve

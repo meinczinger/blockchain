@@ -40,7 +40,7 @@ class Block {
       // Save in auxiliary variable the current block hash
       let currentHash = self.hash;
       // Clear the current block's hash
-      self.hash = '';
+      self.hash = null;
       // Recalculate the hash of the Block
       let computedHash = SHA256(JSON.stringify(self)).toString();
       // Restore the block's hash

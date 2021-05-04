@@ -219,10 +219,31 @@ class Blockchain {
     let self = this;
     let errorLog = [];
     return new Promise(async (resolve, reject) => {
-      // Filter the chain for invalid blocks
-      let invalid_blocks = self.chain.filter(p => p.validate() !== true);
-      resolve(invalid_blocks);
-      reject();
+      // Define array for promises
+      let promises = [];
+      // Loop over all blocks and
+      // 1. validate each
+      // 2. check whether the previous hash matches
+      self.chain.forEach(block => {
+        // Add the block's validate promise to the array of promises
+        promises.push(block.validate());
+        // For all non-genesis blocks check previous hash
+        if(block.height > 0) {
+          block.previousBlockHash !== self.getBlockByHeight(block.height - 1).hash ? errorLog.push(`Error with block ${block.height} - previous hash doesn't match.`) : _;
+        }
+      });
+      // Wait for all promises to resolve
+      Promise.all(promises).then(valResults => {
+        valResults.forEach(result => {
+          // If a block validation failed, add it to the error log
+          if(!result) {
+            errorLog.push(`Error - Block has been tampered.`);
+          }
+        });
+        resolve(errorLog);
+      }).catch(error => {
+        reject(error);
+      });
     });
   }
 

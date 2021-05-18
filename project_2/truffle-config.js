@@ -27,11 +27,11 @@
 //
 // const fs = require('fs');
 // const mnemonic = fs.readFileSync(".secret").toString().trim();
-const HDWalletProvider = require('truffle-hdwallet-provider');
+const HDWalletProvider = require("@truffle/hdwallet-provider");
 const infuraKey = "3d2ae8f2dc964af78daae877e7d4af08";
 //
-// const fs = require('fs');
-const mnemonic = "raw rebuild resource public catch ketchup soap sorry master void trophy bar";
+const fs = require('fs');
+const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 module.exports = {
   /**
@@ -57,10 +57,11 @@ module.exports = {
       network_id: "*",       // Any network (default: none)
     },
     rinkeby: {
-      provider: () => new HDWalletProvider(mnemonic, `https://rinkeby.infura.io/v3/${infuraKey}`),
+      networkCheckTimeout: 10000,
+      provider: () => new HDWalletProvider(mnemonic, `wss://rinkeby.infura.io/ws/v3/${infuraKey}`),
         network_id: 4,       // rinkeby's id
-        gas: 4500000,        // rinkeby has a lower block limit than mainnet
-        gasPrice: 10000000000
+        // gas: 5500000        // rinkeby has a lower block limit than mainnet
+//        gasPrice: 10000000000
     },
 
     // Another network with more advanced options...

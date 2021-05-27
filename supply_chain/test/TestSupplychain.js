@@ -47,7 +47,7 @@ contract('SupplyChain', function(accounts) {
         const supplyChain = await SupplyChain.deployed()
 
         // Harvest an item
-        var event = await supplyChain.harvestItem(upc, originFarmerID, originFarmName, originFarmInformation, originFarmLatitude, originFarmLongitude, productID, productNotes)
+        var event = await supplyChain.harvestItem(upc, originFarmerID, originFarmName, originFarmInformation, originFarmLatitude, originFarmLongitude, productNotes)
 
         // Watch the emitted event Harvested()
         truffleAssert.eventEmitted(event, 'Harvested');
@@ -222,7 +222,6 @@ contract('SupplyChain', function(accounts) {
         // Verify the result set:
         assert.equal(resultBufferTwo[0], sku, 'Error: Invalid item SKU')
         assert.equal(resultBufferTwo[1], upc, 'Error: Invalid item UPC')
-        assert.equal(resultBufferTwo[2], productID, 'Error: Missing or Invalid productID')
         assert.equal(resultBufferTwo[3], productNotes, 'Error: Missing or Invalid productNotes')
         assert.equal(resultBufferTwo[4], productPrice, 'Error: Missing or Invalid productPrice')
         assert.equal(resultBufferTwo[5], 7, 'Error: Missing or Invalid Invalid item State')

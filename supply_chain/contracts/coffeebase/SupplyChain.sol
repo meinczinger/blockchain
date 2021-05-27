@@ -153,7 +153,7 @@ contract SupplyChain {
   }
 
   // Define a function 'harvestItem' that allows a farmer to mark an item 'Harvested'
-  function harvestItem(uint _upc, address payable _originFarmerID, string memory _originFarmName, string memory _originFarmInformation, string  memory _originFarmLatitude, string  memory _originFarmLongitude, uint _productID, string memory _productNotes) public
+  function harvestItem(uint _upc, address payable _originFarmerID, string memory _originFarmName, string memory _originFarmInformation, string  memory _originFarmLatitude, string  memory _originFarmLongitude, string memory _productNotes) public
   {
     // Add the new item as part of Harvest
     items[_upc].sku = sku;
@@ -163,7 +163,6 @@ contract SupplyChain {
     items[_upc].originFarmInformation = _originFarmInformation;
     items[_upc].originFarmLatitude = _originFarmLatitude;
     items[_upc].originFarmLongitude = _originFarmLongitude;
-    items[_upc].productID = _productID;
     items[_upc].productNotes = _productNotes;
 
     // Increment sku

@@ -15,6 +15,9 @@ contract FlightSuretyData {
     // Minimum stake required by airlines to get registered
     uint256 private constant MIN_FUNDING = 100;
 
+    // Insurance premium
+    uint256 private constant INSURANCE_PREMIUM_PERCENTAGE = 120;
+
     // Structure representing an airline
     struct Airline {
         bool registered;
@@ -36,12 +39,13 @@ contract FlightSuretyData {
     // Structure representing claims
     struct InsuranceClaim {
         address passenger;
-        uint8 investedAmount;
+        uint256 investedAmount;
         bool credited;
     }
 
     // Number of airlines registered
     uint256 registeredAirlineCount = 0;
+
     // Airlines
     mapping (address => Airline) private airlines;
 
@@ -51,14 +55,31 @@ contract FlightSuretyData {
     // Flight insurance claims
     mapping (bytes32 => InsuranceClaim[]) private flightInsuranceClaims;
 
+    // Approved insurance payout for passengers
+    mapping (address => uint256) private creditedFunds;
+
+    // Registereed flights
+    bytes32[] private registeredFlights;
+
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
     // Event for airline registration
     event AirlineRegistered(address airline);
 
+    // Event for flight registration
+    event FlightRegistered(bytes32 key);
 
-    /**
+    // Event for purchasing insurance
+    event PassengerBoughtInsurance(bytes32 flightKey, address passenger, uint256 amount);
+
+    // Event for crediting insurees
+    event InsureeCredited(bytes32 flightKey, address passenger, uint256 amount);
+
+    // Event for insuree payout
+    event InsureePaid(address insuree, uint256);
+
+    /*
     * @dev Constructor
     *      The deploying account becomes contractOwner
     *      Input: address of the first airline
@@ -135,6 +156,47 @@ contract FlightSuretyData {
         _;
     }
 
+    /**
+    * @dev Modifier that requires that the flight is not yet registered (to avoid double-registration and wasting gas)
+    */
+    modifier requireFlightNotYetRegistered(bytes32 key) {
+        require(!flights[key].registered, "Flight has been already registered");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires that the flight has been already registered
+    */
+    modifier requireFlightIsRegistered(bytes32 key) {
+        require(flights[key].registered, "Flight has not yet been registered");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires that insurance exists for a given flight
+    */
+    modifier requireInsuranceExistsForFlight(bytes32 flightKey) {
+        require(flightInsuranceClaims[flightKey].length > 0, "There is no insurance for this flight");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires that the address has creditable funds
+    */
+    modifier requireAddressHasCreditableFunds(address insuree) {
+        require(creditedFunds[insuree] > 0, "Address has no credit");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires that this contract has enough funds to credit an insuree
+    */
+    modifier requireContractHasEnoughFunds(uint256 amount) {
+        require(address(this).balance >= amount, "Contract does not have enough balance to credit insuree");
+        _;
+    }
+
+
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
@@ -179,29 +241,63 @@ contract FlightSuretyData {
         emit AirlineRegistered(newAirline);
     }
 
+    /**
+     * @dev Register a flight
+     *       Input:
+     *          - Flight key
+     *          - Airline
+     *          - Flight number
+     *          - Timestamp
+     *          - Departure
+     *          - Arrival§
+     *
+     */
+    function registerFlight(bytes32 flightKey, address airline, string flightNumber, uint256 timestamp,
+        string departure, string arrival)
+        public
+        payable
+        requireIsOperational
+        requireAirlineProvidedFunding(airline)
+        requireFlightNotYetRegistered(flightKey)
+    {
+        flights[flightKey] = Flight(true, airline, flightKey, flightNumber, 0, timestamp, departure, arrival);
+        registeredFlights.push(flightKey);
+        emit FlightRegistered(flightKey);
+    }
 
    /**
     * @dev Buy insurance for a flight
+    *   Input:
+    *       - Flight key
+    *       - Passenger
+    *       - Amount
     *
     */
-    function buy
-                            (
-                            )
-                            external
-                            payable
+    function buyInsurance(bytes32 flightKey, address passenger, uint256 amount)
+        external
+        payable
+        requireIsOperational
+        requireFlightIsRegistered(flightKey)
     {
-
+        flightInsuranceClaims[flightKey].push(InsuranceClaim(passenger, amount, false));
+        emit PassengerBoughtInsurance(flightKey, passenger, amount);
     }
 
     /**
      *  @dev Credits payouts to insurees
     */
-    function creditInsurees
-                                (
-                                )
-                                external
-                                pure
+    function creditInsurees(bytes32 flightKey)
+        external
+        requireIsOperational
+        requireInsuranceExistsForFlight(flightKey)
     {
+        for(uint256 i = 0; i < flightInsuranceClaims[flightKey].length; i++) {
+            InsuranceClaim memory insuranceClaim = flightInsuranceClaims[flightKey][i];
+            insuranceClaim.credited = true;
+            uint256 creditAmount = insuranceClaim.investedAmount.mul(INSURANCE_PREMIUM_PERCENTAGE).div(100);
+            creditedFunds[insuranceClaim.passenger] = creditedFunds[insuranceClaim.passenger].add(creditAmount);
+            emit InsureeCredited(flightKey, insuranceClaim.passenger, creditAmount);
+        }
     }
 
 
@@ -209,12 +305,17 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay
-                            (
-                            )
-                            external
-                            pure
+    function pay(address insuree)
+        external
+        payable
+        requireIsOperational
+        requireAddressHasCreditableFunds(insuree)
+        requireContractHasEnoughFunds(creditedFunds[insuree])
     {
+        uint256 amount = creditedFunds[insuree];
+        creditedFunds[insuree] = 0;
+        address(uint160(address(insuree))).transfer(amount);
+        emit InsureePaid(insuree, amount);
     }
 
    /**
@@ -250,10 +351,7 @@ contract FlightSuretyData {
     * @dev Fallback function for funding smart contract.
     *
     */
-    function()
-                            external
-                            payable
-    {
+    function() external payable {
     }
 
 

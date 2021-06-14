@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.10;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
@@ -43,11 +43,11 @@ contract FlightSuretyData {
         bool credited;
     }
 
-    // Number of airlines registered
-    uint256 registeredAirlineCount = 0;
-
     // Airlines
     mapping (address => Airline) private airlines;
+
+    // Number of airlines registered
+    uint256 nrOfAirlines = 0;
 
     // Flights
     mapping (bytes32 => Flight) private flights;
@@ -78,6 +78,9 @@ contract FlightSuretyData {
 
     // Event for insuree payout
     event InsureePaid(address insuree, uint256);
+
+    // Event for processing flight status
+    event ProcessedFlightStatus(bytes32 flightKey, uint8 status);
 
     /*
     * @dev Constructor
@@ -219,7 +222,64 @@ contract FlightSuretyData {
         operational = mode;
     }
 
+    /**
+    * @dev Check if the airline is already registered
+    * @return Airline registered (true/false)
+    */
+    function isAirlineRegistered(address airline) public view requireIsOperational returns(bool) {
+        return airlines[airline].registered;
+    }
 
+    /**
+    * @dev Check if airline is already funded
+    * @return Airline funded (true/false)
+    */
+    function isAirlineFunded(address airline) public view returns(bool) {
+        return airlines[airline].funded;
+    }
+
+    /**
+    * @dev Check if flight is registered
+    * @return Airline Registered (true/false)
+    */
+    function isFlightRegistered(bytes32 flightKey) public view returns(bool) {
+        return flights[flightKey].registered;
+    }
+
+    /**
+    * @dev Check if flight has landed
+    * @return Status if flight landed (true/false)
+    */
+    function isFlightLanded(bytes32 flightKey) public view returns(bool) {
+        if (flights[flightKey].status > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @dev Get the number of airlines already registered
+     * @return Number of registered airlines
+     */
+    function getNrOfRegisteredAirlines() public view requireIsOperational returns(uint256) {
+        return nrOfAirlines;
+    }
+
+    /**
+     * @dev Check, if a passenger is already insured
+     * @return True if passenger is already insured, otherwise false
+     */
+    function isPassengerInsured(bytes32 flightKey, address passenger) public view returns(bool) {
+        InsuranceClaim[] memory insuranceClaims = flightInsuranceClaims[flightKey];
+        for (uint256 i = 0; i < insuranceClaims.length; i++) {
+            if (insuranceClaims[i].passenger == passenger) {
+                // Passenger found, return true (and break)
+                return true;
+            }
+        }
+        // Passenger not yet insured
+        return false;
+    }
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -237,7 +297,7 @@ contract FlightSuretyData {
         requireAirlineProvidedFunding(registeringAirline)
     {
         airlines[newAirline] = Airline(true, false);
-        registeredAirlineCount = registeredAirlineCount.add(1);
+        nrOfAirlines = nrOfAirlines.add(1);
         emit AirlineRegistered(newAirline);
     }
 
@@ -252,8 +312,8 @@ contract FlightSuretyData {
      *          - Arrival§
      *
      */
-    function registerFlight(bytes32 flightKey, address airline, string flightNumber, uint256 timestamp,
-        string departure, string arrival)
+    function registerFlight(bytes32 flightKey, address airline, string memory flightNumber, uint256 timestamp,
+        string memory departure, string memory arrival)
         public
         payable
         requireIsOperational
@@ -263,6 +323,29 @@ contract FlightSuretyData {
         flights[flightKey] = Flight(true, airline, flightKey, flightNumber, 0, timestamp, departure, arrival);
         registeredFlights.push(flightKey);
         emit FlightRegistered(flightKey);
+    }
+
+    /**
+     * @dev Buy insurance for a flight
+     *   Input:
+     *       - Airline
+     *       - Flight number
+     *       - Timestamp
+     *       - Flight statua
+     *
+     */
+    function processFlightStatus(address airline, string calldata flight, uint256 timestamp, uint8 statusCode)
+        external requireIsOperational
+    {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        require(!isFlightLanded(flightKey), "Flight has already landed.");
+        if (flights[flightKey].status == 0) {
+            flights[flightKey].status = statusCode;
+            if (statusCode == 20) {
+                creditInsurees(flightKey);
+            }
+        }
+        emit ProcessedFlightStatus(flightKey, statusCode);
     }
 
    /**
@@ -287,7 +370,7 @@ contract FlightSuretyData {
      *  @dev Credits payouts to insurees
     */
     function creditInsurees(bytes32 flightKey)
-        external
+        internal
         requireIsOperational
         requireInsuranceExistsForFlight(flightKey)
     {
@@ -305,7 +388,7 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay(address insuree)
+    function pay(address payable insuree)
         external
         payable
         requireIsOperational
@@ -334,15 +417,10 @@ contract FlightSuretyData {
 
     }
 
-    function getFlightKey
-                        (
-                            address airline,
-                            string memory flight,
-                            uint256 timestamp
-                        )
-                        pure
-                        internal
-                        returns(bytes32)
+    function getFlightKey(address airline, string memory flight, uint256 timestamp)
+        internal
+        pure
+        returns(bytes32)
     {
         return keccak256(abi.encodePacked(airline, flight, timestamp));
     }

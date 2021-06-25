@@ -166,13 +166,19 @@ contract FlightSuretyApp {
     /********************************************************************************************/
 
     function isOperational()
-                            public
-                            pure
-                            returns(bool)
+        public
+        pure
+        returns(bool)
     {
         return true;  // Modify to call data contract's status
     }
 
+    function insuranceLimit() 
+        public
+        returns (uint256 limit)
+    {
+        return MAX_INSURANCE_LIMIT;
+    }
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/

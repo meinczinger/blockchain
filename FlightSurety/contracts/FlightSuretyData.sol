@@ -43,6 +43,9 @@ contract FlightSuretyData {
         bool credited;
     }
 
+    // Autherized callers
+    mapping(address => uint256) private authorizedCallers;
+
     // Airlines
     mapping (address => Airline) private airlines;
 
@@ -81,6 +84,12 @@ contract FlightSuretyData {
 
     // Event for processing flight status
     event ProcessedFlightStatus(bytes32 flightKey, uint8 status);
+
+    // Event for authorization of app
+    event AuthorizedApp(address app);
+
+    // Event for deauthorization of app
+    event DeAuthorizedApp(address app);
 
     /*
     * @dev Constructor
@@ -283,6 +292,30 @@ contract FlightSuretyData {
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
+
+    /**
+     * @dev Authorize the caller
+     * @return None
+     */
+    function authorizeApp(address app)
+        external
+        requireContractOwner
+    {
+        authorizedCallers[app] = 1;
+        emit AuthorizedApp(app);
+    }
+
+    /**
+     * @dev Deauthorize the caller
+     * @return None
+     */
+     function deauthorizeApp(address app)
+        external
+        requireContractOwner
+    {
+        delete authorizedCallers[app];
+        emit DeAuthorizedApp(app);
+    }
 
    /**
     * @dev Add an airline to the registration queue

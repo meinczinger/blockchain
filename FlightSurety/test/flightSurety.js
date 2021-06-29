@@ -1,6 +1,7 @@
 
 var Test = require('../config/testConfig.js');
 var BigNumber = require('bignumber.js');
+const truffleAssert = require('truffle-assertions');
 
 contract('Flight Surety Tests', async (accounts) => {
 
@@ -95,28 +96,101 @@ contract('Flight Surety Tests', async (accounts) => {
             });
         });
 
-        it('(airline) cannot be registered more than once', async () => {
+        describe('Register an airline without funding', function () {
+            it('(airline) cannot be registered more than once', async () => {
 
-            // ARRANGE
-            let newAirline = config.restOfAddresses[0];
-            // flag to capture exception
-            let exception_caught = false;
+                // ARRANGE
+                let newAirline = config.restOfAddresses[0];
+                // flag to capture exception
+                let exception_caught = false;
 
-            // ACT
-            try {
-                await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
-                // Register the same airline once more
-                await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
-            }
-            catch (e) {
-                exception_caught = true;
-            }
+                // ACT
+                try {
+                    await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
+                    // Register the same airline once more
+                    await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
+                }
+                catch (e) {
+                    exception_caught = true;
+                }
 
-            // ASSERT
-            assert.equal(exception_caught, true, "The same airline cannot be registered twice");
+                // ASSERT
+                assert.equal(exception_caught, true, "The same airline cannot be registered twice");
 
+            });
         });
-    })
+
+        describe('Funding an already funded airline', function () {
+            it('(airline) cannot be funded more than once', async () => {
+                // ARRANGE
+                let newAirline = config.restOfAddresses[0];
+                // flag to capture exception
+                let exception_caught = false;
+
+                let minStake = await config.flightSuretyApp.airlineMinimumStake.call();
+
+                // ACT
+                try {
+                    await config.flightSuretyApp.fundAirline({ from: config.firstAirline, value: minStake});
+                    // Register the same airline once more
+                    await config.flightSuretyApp.fundAirline({ from: config.firstAirline, value: minStake});
+                }
+                catch (e) {
+                    exception_caught = true;
+                }
+
+                // ASSERT
+                assert.equal(exception_caught, true, "The same airline cannot be funded twice");
+            });
+        });
+    });
+
+    describe('Flight test suite', function () {
+        describe('Register a flight for an airline without registration', function () {
+            it('(flight) cannot be register if the airline is not registered', async () => {
+                // ARRANGE
+                let newAirline = config.restOfAddresses[0];
+                // flag to capture exception
+                let exception_caught = false;
+
+                let minStake = await config.flightSuretyApp.airlineMinimumStake.call();
+
+                // ACT
+                try {
+                    await config.flightSuretyApp.fundAirline({ from: config.firstAirline, value: minStake});
+                    // Register a flight
+                    await config.flightSuretyApp.registerFlight("AB 1234", 0, "KUL", "PRG", { from: config.firstAirline });
+                }
+                catch (e) {
+                    exception_caught = true;
+                }
+
+                // ASSERT
+                assert.equal(exception_caught, true, "Flight cannot be registered if the airline is not registered");
+            });
+        });
+
+        describe('Flight status change', function () {
+            it('(flight) status change triggers an event', async () => {
+                // ARRANGE
+                let newAirline = config.restOfAddresses[0];
+
+                let minStake = await config.flightSuretyApp.airlineMinimumStake.call();
+
+                // Fund airline
+                await config.flightSuretyApp.fundAirline({ from: config.firstAirline, value: minStake});
+                // Register airline
+                await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
+                // Register a flight
+                await config.flightSuretyApp.registerFlight("AB 1234", 0, "KUL", "PRG", { from: newAirline });
+                // Change status
+                let result = await config.flightSuretyApp.fetchFlightStatus(newAirline, "AB 1234", 0, 0);
+                // ASSERT
+                truffleAssert.eventEmitted(result, 'ProcessedFlightStatus',  "Flight cannot be registered if the airline is not registered");
+            });
+        });
+    });
+
     describe('Passenger test suite', function () {
         it('(passanger) cannot buy insurance for more than the defined limit (MAX_INSURANCE_LIMIT)', async () => {
             let airline = config.restOfAddresses[0];

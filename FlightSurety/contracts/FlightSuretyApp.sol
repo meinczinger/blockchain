@@ -173,12 +173,22 @@ contract FlightSuretyApp {
         return true;  // Modify to call data contract's status
     }
 
-    function insuranceLimit() 
+    function insuranceLimit()
         public
+        pure
         returns (uint256 limit)
     {
         return MAX_INSURANCE_LIMIT;
     }
+
+    function airlineMinimumStake()
+        public
+        pure
+        returns (uint256 stake)
+    {
+        return AIRLINE_MINIMUM_STAKE;
+    }
+    
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -234,7 +244,6 @@ contract FlightSuretyApp {
         external
         payable
         requireIsOperational
-        requireAirlineIsRegistered(msg.sender)
         requireAirlineNotYetFunded(msg.sender)
         requireEnoughFundingProvided()
     {
@@ -249,6 +258,7 @@ contract FlightSuretyApp {
     function registerFlight(string calldata flightNumber, uint256 timestamp, string calldata departure, string calldata arrival)
         external
         requireIsOperational
+        requireAirlineIsRegistered(msg.sender)
         requireIsAirlineFunded(msg.sender)
     {
         bytes32 flightKey = getFlightKey(msg.sender, flightNumber, timestamp);
@@ -379,7 +389,7 @@ contract FlightSuretyApp {
                                     });
     }
 
-    function getMyIndexes() view external returns(uint8[3] memory)
+    function getMyIndexes() external view returns(uint8[3] memory)
     {
         require(oracles[msg.sender].isRegistered, "Not registered as an oracle");
 
@@ -395,7 +405,8 @@ contract FlightSuretyApp {
     // time of registration (i.e. uninvited oracles are not welcome)
     function submitOracleResponse(uint8 index, address airline, string calldata flight, uint256 timestamp, uint8 statusCode) external
     {
-        require((oracles[msg.sender].indexes[0] == index) || (oracles[msg.sender].indexes[1] == index) || (oracles[msg.sender].indexes[2] == index), "Index does not match oracle request");
+        require((oracles[msg.sender].indexes[0] == index) || (oracles[msg.sender].indexes[1] == index) || 
+        (oracles[msg.sender].indexes[2] == index), "Index does not match oracle request");
 
 
         bytes32 key = keccak256(abi.encodePacked(index, airline, flight, timestamp));
@@ -416,7 +427,7 @@ contract FlightSuretyApp {
     }
 
 
-    function getFlightKey(address airline, string memory flight, uint256 timestamp) pure internal returns(bytes32) {
+    function getFlightKey(address airline, string memory flight, uint256 timestamp) internal pure returns(bytes32) {
         return keccak256(abi.encodePacked(airline, flight, timestamp));
     }
 
